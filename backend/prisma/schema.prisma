@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile            Profile?
+  sentRequests       ConnectRequest[] @relation("SentRequests")
+  receivedRequests   ConnectRequest[] @relation("ReceivedRequests")
+  connectionsAsOne   Connection[]     @relation("UserOne")
+  connectionsAsTwo   Connection[]     @relation("UserTwo")
+  messages           Message[]
+  notifications      Notification[]
+
+  @@map("users")
+}
+
+model Profile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  username      String   @unique
+  displayName   String
+  avatar        String?
+  bio           String?
+  interests     String[]
+  lookingFor    String?
+  instagramLink String?
+  websiteLink   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  compliments Compliment[]
+  questions   Question[]
+  comments    Comment[]
+
+  @@map("profiles")
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  PASSED
+  LATER
+}
+
+model ConnectRequest {
+  id         String        @id @default(cuid())
+  senderId   String
+  receiverId String
+  message    String?
+  status     RequestStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+
+  sender   User @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@map("connect_requests")
+}
+
+model Connection {
+  id        String   @id @default(cuid())
+  userOneId String
+  userTwoId String
+  createdAt DateTime @default(now())
+
+  userOne      User          @relation("UserOne", fields: [userOneId], references: [id], onDelete: Cascade)
+  userTwo      User          @relation("UserTwo", fields: [userTwoId], references: [id], onDelete: Cascade)
+  conversation Conversation?
+
+  @@unique([userOneId, userTwoId])
+  @@map("connections")
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  connectionId String   @unique
+  createdAt    DateTime @default(now())
+
+  connection Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  messages   Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Compliment {
+  id        String   @id @default(cuid())
+  profileId String
+  content   String
+  approved  Boolean  @default(false)
+  anonymous Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("compliments")
+}
+
+model Question {
+  id        String   @id @default(cuid())
+  profileId String
+  question  String
+  answer    String?
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("questions")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  profileId String
+  content   String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+enum NotificationType {
+  CONNECT_REQUEST
+  REQUEST_ACCEPTED
+  NEW_MESSAGE
+  NEW_COMPLIMENT
+  NEW_QUESTION
+  QUESTION_ANSWERED
+  NEW_COMMENT
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
